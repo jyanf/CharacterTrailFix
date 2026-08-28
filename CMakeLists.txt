@@ -9,7 +9,7 @@ set(VERSION_MAJOR "0.1" CACHE STRINGS "version major")
 set(VERSION_MINOR "0" CACHE STRINGS "version minor")
 set(VERSION_DOT "${VERSION_MAJOR}.${VERSION_MINOR}")
 set(I_DESCRIPTION "Description of ModTemplate" CACHE STRINGS "Description")
-project(ModTemplate
+project(YoumuTrailFix
     VERSION ${VERSION_MAJOR}.${VERSION_DAY}.${VERSION_YEAR}
     DESCRIPTION ${I_DESCRIPTION}
     LANGUAGES C CXX
