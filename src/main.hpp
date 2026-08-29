@@ -20,7 +20,8 @@ inline auto iniProxy = cfg::Config{
 		,addInteger<"Color">(0x00ffff00)
 	),
 	addSection<"Others">(
-
+		addBool<"Debug">(false)
+		,addBool<"TryFitRivDecerlerate">(false)
 	)
 };
 

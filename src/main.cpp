@@ -27,13 +27,19 @@ static inline std::filesystem::path toAbsPath(const std::filesystem::path& path,
 namespace {
 	using SokuLib::SpriteEx, SokuLib::DrawUtils::DxSokuColor, SokuLib::TamperNearCall;
 	using SokuLib::v2::AnimationObject, SokuLib::v2::Player;
-	struct TrailNode {
-		SpriteEx sprite;
-		byte blendMode;
+	using TrailImage = struct __TrailImage {
+		struct SpriteTrail : public SpriteEx {
+			byte blendMode;
+			char align[3];
+		};
+		SokuLib::List<SpriteTrail> sprites;
+		byte step;
+		char align0d;
+		short maxSize;
+		DWORD color;
+		byte unknown14;
+		char align15[3];
 	};
-	using Node = SokuLib::List<TrailNode>;
-	//SpriteEx* ListSprite_insert(ListNode* succ, ListNode* pred, CSpriteEx* val)
-	//using OrgFunc = SpriteEx* __stdcall(Node*, Node*, SpriteEx*);
 #define ADDR_TRAIL_COPIER 0x4634ce
 	//void __thiscall CSpriteEx_copy(CSpriteEx*, CSpriteEx*)
 	using OrgFunc1 = void __thiscall(SpriteEx*, SpriteEx*);
@@ -42,19 +48,32 @@ namespace {
 	static void __fastcall RenderFixer(SpriteEx* This, int _, SpriteEx* character) {
 		orgRenderFixer(This, character);
 		if (iniProxy["RenderFix"_l]["Enabled"_l]) {
-			auto& parent = *reinterpret_cast<AnimationObject*>((DWORD)character - 4);
+			auto& parent = *reinterpret_cast<Player*>((DWORD)character - 4);
 			DxSokuColor color(iniProxy["RenderFix"_l]["Color"_l]);
-			color *= parent.renderInfos.color;
+			color *= DxSokuColor(parent.renderInfos.color);
 			This->setColor(color);
+			if (iniProxy["Others"_l]["Debug"_l]) {
+				auto& trail = *reinterpret_cast<TrailImage*>(&parent.unknown714);
+				trail.color = parent.teamId ? 0x0000ffff : 0x00ff00ff;
+				trail.step = 1;
+			}
 		}
 	}
 
 #define ADDR_TRAIL_APPEND 0x46a71c
 	//void __thiscall PlayerTrail_addNode(TrailImage*, AnimationState*, byte mode)
-	using OrgFunc2 = void __thiscall(void*, SpriteEx*, byte);
+	using OrgFunc2 = void __thiscall(TrailImage*, SpriteEx*, byte);
 	using OrgFunc2Ptr = OrgFunc2*;
+	static int lastFrame = -1;//hasty fit
+	const int& gCounter = *reinterpret_cast<int*>(0x8985d8);
 	OrgFunc2Ptr orgAutoTrailer = nullptr;
-	static void __fastcall AutoTrailer(void* This, int _, SpriteEx* character, byte mode) {
+	static void __fastcall AutoTrailer(TrailImage* This, int _, SpriteEx* character, byte mode) {
+		if (iniProxy["Others"_l]["TryFitRivDecerlerate"_l]) {
+			if (lastFrame == gCounter) {
+				std::cout << "jumped" <<std::endl;
+				return;
+			}
+		}
 		if (iniProxy["AutoTrail"_l]["Enabled"_l]) {
 			int cmode = iniProxy["AutoTrail"_l]["BlendMode"_l];
 			mode = cmode>=0 ? cmode : mode;
@@ -63,8 +82,8 @@ namespace {
 	}
 
 #define ADDR_TRAIL_SETTER 0x56d649
-	//void __thiscall Player_SetTrail(Player *this,int timer,int step,uint color)
-	using OrgFunc3 = void __thiscall(Player*, int timer, int step, UINT32 color);
+	//void __thiscall Player_SetTrail(Player *this, int timer, int step, uint color)
+	using OrgFunc3 = void __thiscall(Player*, int, int, UINT32);
 	using OrgFunc3Ptr = OrgFunc3*;
 	OrgFunc3Ptr orgYoumuTrailer = nullptr;
 	static void __fastcall YoumuTrailer(Player* This, int _, int timer, int step, UINT32 color) {
@@ -74,6 +93,19 @@ namespace {
 			orgYoumuTrailer(This, timer, step, color);
 		}
 	}
+
+#define ADDR_TOTAL_RENDER 0x47a9bf
+	//void __thiscall CBattleManager_RenderBattle(CBattleManager *this)
+	using OrgFunc4 = void __thiscall(SokuLib::BattleManager*);
+	using OrgFunc4Ptr = OrgFunc4*;
+	OrgFunc4Ptr orgTotalRenderer = nullptr;
+	static void __fastcall TotalRenderer(SokuLib::BattleManager* This) {
+		orgTotalRenderer(This);
+		std::cout << lastFrame << "->" << gCounter <<"\n" << std::endl;
+		lastFrame = gCounter;
+	}
+
+#define ADDR_TRAIL_CLEANER_JUDGE 0x46a728
 }
 
 
@@ -102,6 +134,13 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hPar
 	orgRenderFixer = TamperNearCall(ADDR_TRAIL_COPIER, SokuLib::union_cast<decltype(orgRenderFixer)>(&RenderFixer));
 	orgAutoTrailer = TamperNearCall(ADDR_TRAIL_APPEND, SokuLib::union_cast<decltype(orgAutoTrailer)>(&AutoTrailer));
 	orgYoumuTrailer = TamperNearCall(ADDR_TRAIL_SETTER, SokuLib::union_cast<decltype(orgYoumuTrailer)>(&YoumuTrailer));
+	if (iniProxy["Others"_l]["TryFitRivDecerlerate"_l]) {
+		orgTotalRenderer = TamperNearCall(ADDR_TOTAL_RENDER, SokuLib::union_cast<decltype(orgTotalRenderer)>(&TotalRenderer));
+	}
+	if (iniProxy["Others"_l]["Debug"_l]) {
+		std::cout << "Debug mode enabled" << std::endl;
+		*(byte*)ADDR_TRAIL_CLEANER_JUDGE = 0xEB;//jg -> jmp
+	}
 	VirtualProtect((PVOID)TEXT_SECTION_OFFSET, TEXT_SECTION_SIZE, old, &old);
 
 	FlushInstructionCache(GetCurrentProcess(), nullptr, 0);
