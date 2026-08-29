@@ -34,7 +34,7 @@ namespace {
 		};
 		SokuLib::List<SpriteTrail> sprites;
 		byte step;
-		char align0d;
+		byte personal_stepIndex;
 		short maxSize;
 		DWORD color;
 		bool personal_rainbowOn;//reuse fields for personal rainbow effect
@@ -70,7 +70,7 @@ namespace {
 			if (iniProxy["Others"_l]["Debug"_l]) {
 				if (iniProxy["Others"_l]["Sandevistan"_l]) {
 					trail.step = 4;
-					trail.color = 0xFFffffff;
+					trail.color = 0x3Fffffff;
 					std::cout << "Sandevistan debug enabled" << std::endl;
 					trail.personal_rainbowOn = true;
 					trail.personal_rainbowStep = 7;
@@ -102,8 +102,11 @@ namespace {
 				return;
 			}
 		}
-		if (iniProxy["Others"_l]["Debug"_l] && iniProxy["Others"_l]["Sandevistan"_l]) {
-			This->maxSize = 30;
+		if (iniProxy["Others"_l]["Sandevistan"_l]) {
+			if (iniProxy["Others"_l]["Debug"_l]) {
+				This->maxSize = 30;
+			}
+			This->personal_stepIndex -= 1;
 		}
 		if (iniProxy["AutoTrail"_l]["Enabled"_l]) {
 			int cmode = iniProxy["AutoTrail"_l]["BlendMode"_l];
@@ -137,6 +140,24 @@ namespace {
 	}
 
 #define ADDR_TRAIL_CLEANER_JUDGE 0x46a728
+
+#define ADDR_STEP_INDEX_MATCH 0x463173
+	//00463173 83c1ff	ADD ECX,-0x1
+	//00463176 3bd1		CMP EDX, ECX
+	static TrampTamper<5> stepIndexTamper(ADDR_STEP_INDEX_MATCH);
+	__declspec(naked) void stepIntercept() {
+		__asm {
+			movzx eax, byte ptr[edi + 0Dh] // personal_stepIndex
+			// stepIndex %= ECX; ECX>0
+			xor edx, edx
+			div ecx
+			// ECX = stepIndex % ECX
+			inc edx
+			mov[esp + 1Ch], edx
+
+			ret
+		}
+	}
 }
 
 
@@ -171,6 +192,9 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hPar
 	if (iniProxy["Others"_l]["Debug"_l]) {
 		std::cout << "Debug mode enabled" << std::endl;
 		*(byte*)ADDR_TRAIL_CLEANER_JUDGE = 0xEB;//jg -> jmp
+	}
+	if (iniProxy["Others"_l]["Sandevistan"_l]) {
+		stepIndexTamper.hook(&stepIntercept);
 	}
 	VirtualProtect((PVOID)TEXT_SECTION_OFFSET, TEXT_SECTION_SIZE, old, &old);
 
