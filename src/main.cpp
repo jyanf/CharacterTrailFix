@@ -37,26 +37,54 @@ namespace {
 		char align0d;
 		short maxSize;
 		DWORD color;
-		byte unknown14;
-		char align15[3];
+		bool personal_rainbowOn;//reuse fields for personal rainbow effect
+		byte personal_rainbowStep;
+		unsigned short personal_hue;
 	};
 #define ADDR_TRAIL_COPIER 0x4634ce
 	//void __thiscall CSpriteEx_copy(CSpriteEx*, CSpriteEx*)
 	using OrgFunc1 = void __thiscall(SpriteEx*, SpriteEx*);
 	using OrgFunc1Ptr = OrgFunc1*;
 	OrgFunc1Ptr orgRenderFixer = nullptr;
+	static DxSokuColor tint_hue(unsigned short hue) {
+		hue %= 360;
+		if (hue < 0) hue += 360;
+		int phase = hue / 60, c = hue % 60 * 255.0 / 60.0;
+		DxSokuColor result(0xFFFFFFFF);
+		auto p = reinterpret_cast<byte*>(&result);
+
+		static const uint8_t f[] = { 2,1,1,0,0,2 };
+		static const uint8_t v[] = { 1,2,0,1,2,0 };
+
+		p[0] = p[1] = p[2] = 0;
+		p[f[phase]] = 255;
+		p[v[phase]] = (phase % 2) ? 255 - c : c;
+		return result;
+	}
 	static void __fastcall RenderFixer(SpriteEx* This, int _, SpriteEx* character) {
 		orgRenderFixer(This, character);
 		if (iniProxy["RenderFix"_l]["Enabled"_l]) {
 			auto& parent = *reinterpret_cast<Player*>((DWORD)character - 4);
+			auto& trail = *reinterpret_cast<TrailImage*>(&parent.unknown714);
 			DxSokuColor color(iniProxy["RenderFix"_l]["Color"_l]);
+			if (iniProxy["Others"_l]["Debug"_l]) {
+				if (iniProxy["Others"_l]["Sandevistan"_l]) {
+					trail.step = 4;
+					trail.color = 0xFFffffff;
+					std::cout << "Sandevistan debug enabled" << std::endl;
+					trail.personal_rainbowOn = true;
+					trail.personal_rainbowStep = 7;
+				} else {
+					trail.step = 1;
+					trail.color = parent.teamId ? 0x0000ffff : 0x00ff00ff;
+				}
+			}
+			if (iniProxy["Others"_l]["Sandevistan"_l] && trail.personal_rainbowOn) {
+				trail.personal_hue = (trail.personal_hue + trail.personal_rainbowStep) % 360;
+				color *= tint_hue(trail.personal_hue);
+			}
 			color *= DxSokuColor(parent.renderInfos.color);
 			This->setColor(color);
-			if (iniProxy["Others"_l]["Debug"_l]) {
-				auto& trail = *reinterpret_cast<TrailImage*>(&parent.unknown714);
-				trail.color = parent.teamId ? 0x0000ffff : 0x00ff00ff;
-				trail.step = 1;
-			}
 		}
 	}
 
@@ -73,6 +101,9 @@ namespace {
 				std::cout << "jumped" <<std::endl;
 				return;
 			}
+		}
+		if (iniProxy["Others"_l]["Debug"_l] && iniProxy["Others"_l]["Sandevistan"_l]) {
+			This->maxSize = 30;
 		}
 		if (iniProxy["AutoTrail"_l]["Enabled"_l]) {
 			int cmode = iniProxy["AutoTrail"_l]["BlendMode"_l];

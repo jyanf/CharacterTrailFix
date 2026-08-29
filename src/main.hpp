@@ -22,6 +22,7 @@ inline auto iniProxy = cfg::Config{
 	addSection<"Others">(
 		addBool<"Debug">(false)
 		,addBool<"TryFitRivDecerlerate">(false)
+		,addBool<"Sandevistan">(false)
 	)
 };
 
