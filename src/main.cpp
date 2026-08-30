@@ -145,18 +145,11 @@ namespace {
 	//00463173 83c1ff	ADD ECX,-0x1
 	//00463176 3bd1		CMP EDX, ECX
 	static TrampTamper<5> stepIndexTamper(ADDR_STEP_INDEX_MATCH);
-	__declspec(naked) void stepIntercept() {
-		__asm {
-			movzx eax, byte ptr[edi + 0Dh] // personal_stepIndex
-			// stepIndex %= ECX; ECX>0
-			xor edx, edx
-			div ecx
-			// ECX = stepIndex % ECX
-			inc edx
-			mov[esp + 1Ch], edx
-
-			ret
-		}
+	void __fastcall stepIntercept(CPUState* state) {
+		auto& trail = *reinterpret_cast<TrailImage*>(state->edi);
+		int stepIndex = trail.personal_stepIndex;
+		stepIndex %= trail.step;//%= step
+		state->ecx = stepIndex+1;
 	}
 }
 
