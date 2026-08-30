@@ -38,7 +38,7 @@ namespace {
 		short maxSize;
 		DWORD color;
 		bool personal_rainbowOn;//reuse fields for personal rainbow effect
-		byte personal_rainbowStep;
+		byte personal_hueStep;
 		unsigned short personal_hue;
 	};
 #define ADDR_TRAIL_COPIER 0x4634ce
@@ -73,14 +73,14 @@ namespace {
 					trail.color = 0x3Fffffff;
 					std::cout << "Sandevistan debug enabled" << std::endl;
 					trail.personal_rainbowOn = true;
-					trail.personal_rainbowStep = 7;
+					trail.personal_hueStep = 7;
 				} else {
 					trail.step = 1;
 					trail.color = parent.teamId ? 0x0000ffff : 0x00ff00ff;
 				}
 			}
 			if (iniProxy["Others"_l]["Sandevistan"_l] && trail.personal_rainbowOn) {
-				trail.personal_hue = (trail.personal_hue + trail.personal_rainbowStep) % 360;
+				trail.personal_hue = (trail.personal_hue + trail.personal_hueStep) % 360;
 				color *= tint_hue(trail.personal_hue);
 			}
 			color *= DxSokuColor(parent.renderInfos.color);
@@ -106,6 +106,8 @@ namespace {
 			if (iniProxy["Others"_l]["Debug"_l]) {
 				This->maxSize = 30;
 			}
+		}
+		if (iniProxy["RenderFix"_l]["StepType"_l]) {
 			This->personal_stepIndex -= 1;
 		}
 		if (iniProxy["AutoTrail"_l]["Enabled"_l]) {
@@ -186,7 +188,7 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hPar
 		std::cout << "Debug mode enabled" << std::endl;
 		*(byte*)ADDR_TRAIL_CLEANER_JUDGE = 0xEB;//jg -> jmp
 	}
-	if (iniProxy["Others"_l]["Sandevistan"_l]) {
+	if (iniProxy["RenderFix"_l]["StepType"_l]) {
 		stepIndexTamper.hook(&stepIntercept);
 	}
 	VirtualProtect((PVOID)TEXT_SECTION_OFFSET, TEXT_SECTION_SIZE, old, &old);

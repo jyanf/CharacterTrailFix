@@ -14,6 +14,7 @@ inline auto iniProxy = cfg::Config{
 	),
 	addSection<"RenderFix">(addBool<"Enabled">(true)
 		,addInteger<"Color">(0x40ffffff)
+		,addBool<"StepType">(false)
 	),
 	addSection<"Youmu6DTrail">(addBool<"Enabled">(true)
 		,addInteger<"Step">(4)
